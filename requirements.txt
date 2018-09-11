@@ -1,0 +1,6 @@
+flask
+flask-restplus
+flask-script
+requests
+py2neo
+Crypo
