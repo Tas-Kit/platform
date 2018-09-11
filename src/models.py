@@ -48,7 +48,7 @@ class User(GraphObject):
     def get_role(self, app):
         role = self.has.get(app, 'role')
         if role is None:
-            handle_error('Unable to find app for current user', ERROR_CODE.NOT_HAVE_APP)
+            handle_error('Unable to find app for current user.', ERROR_CODE.NOT_HAVE_APP)
         return role
 
     def get_message(self, _id, role):
