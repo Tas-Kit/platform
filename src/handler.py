@@ -1,7 +1,6 @@
 from time import time
-from . import db
-from .utils import handle_error
-from .rsa_helper import decrypt
+from . import db, blowfish
+from .utils import handle_error, decrypt
 from .models import User, MiniApp, TObject
 from .constants import ERROR_CODE
 
@@ -23,12 +22,12 @@ def get_app(aid):
 
 def verify_platform_root_key(uid, platform_root_key):
     try:
-        message = decrypt(platform_root_key)
+        data = decrypt(platform_root_key)
     except Exception as e:
         handle_error(e, ERROR_CODE.UNABLE_TO_DECRYPT)
-    if uid != message['uid']:
+    if uid != data['uid']:
         handle_error("User does not match the platform root key.", ERROR_CODE.USER_NOT_MATCH)
-    if int(time()) > message['exp']:
+    if int(time()) > data['exp']:
         handle_error("Platfor root key expired.", ERROR_CODE.PLATFORM_KEY_EXPIRED)
 
 

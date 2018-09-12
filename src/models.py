@@ -1,8 +1,8 @@
 from py2neo.ogm import GraphObject, Property, RelatedFrom, RelatedTo
 import json
 import time
-from . import rsa_helper
-from .utils import handle_error
+from . import blowfish
+from .utils import handle_error, encrypt
 from settings import SIGNATURE_DURATION
 from .constants import ERROR_CODE
 
@@ -36,13 +36,12 @@ class User(GraphObject):
             'uid': self.uid,
             'exp': int(time.time()) + SIGNATURE_DURATION
         }
-        message = json.dumps(data)
-        return rsa_helper.encrypt(message)
+        return encrypt(data)
 
     def generate_app_key(self, app):
         role = self.get_role(app)
         message = self.get_message(app.aid, role)
-        app_key = rsa_helper.encrypt(message)
+        app_key = encrypt(message)
         return app_key
 
     def get_role(self, app):
@@ -52,18 +51,9 @@ class User(GraphObject):
         return role
 
     def get_message(self, _id, role):
-        data = {
+        return {
             'uid': self.uid,
             '_id': _id,
-            'r': role,
+            'role': role,
             'exp': int(time.time()) + SIGNATURE_DURATION
         }
-        return json.dumps(data).replace(' ', '')
-
-    def verify(self, _id, role, signature):
-        message = self.get_message(_id, role)
-        return rsa_helper.verify(message, signature)
-
-    def sign(self, _id, role):
-        message = self.get_message(_id, role)
-        return rsa_helper.sign(message)
