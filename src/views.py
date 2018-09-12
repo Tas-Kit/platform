@@ -2,9 +2,8 @@
 # a Python package so it can be accessed using the 'import' statement.
 
 from flask import Blueprint
-from flask_restplus import Api, Resource, reqparse
-from .models import User, MiniApp, TObject
-from . import db, utils, handler
+from flask_restplus import Api, Resource, reqparse, fields
+from . import handler
 
 main_blueprint = Blueprint('main', __name__)
 
@@ -23,10 +22,11 @@ uid_parser.add_argument('uid', type=str, location='cookies')
 @internal_ns.route('/')
 class InternalView(Resource):
 
-    @internal_ns.doc('Get Platform root key', parser=uid_parser)
+    @api.doc('Get Platform root key', parser=uid_parser)
     def get(self):
         """
         Get the child TObjects of Current TObject
+        If it is the mini app root, pass 'root' for oid
         """
         args = uid_parser.parse_args()
         uid = args['uid']
@@ -43,7 +43,7 @@ app_parser.add_argument('PlatformRootKey', required=True, type=str, location='he
 @app_ns.route('/<string:aid>/')
 class MiniAppView(Resource):
 
-    @app_ns.doc('Get MiniApp key', parser=app_parser)
+    @api.doc('Get MiniApp key', parser=app_parser)
     def get(self, aid):
         """
         Get the child TObjects of Current TObject
@@ -56,17 +56,32 @@ class MiniAppView(Resource):
 
 obj_ns = api.namespace('tobject', description='TObject level operation namespace.')
 
-parser = reqparse.RequestParser()
+obj_parser = reqparse.RequestParser()
+obj_parser.add_argument('uid', type=str, location='cookies')
+obj_parser.add_argument('MiniAppKey', required=True, type=str, location='headers')
+obj_parser.add_argument('children', type=str, location='form')
+obj_parser.add_argument('labels', type=list, location='form')
+
+obj_model = api.model('TObject', {
+    'oid': fields.String(description='TObject ID.'),
+    'properties': fields.String(description='The actual properties (json encoded) in the customer object.'),
+    'labels': fields.List(fields.String, description='The all classes of the customer object (Avoid "TObject".'),
+    'key': fields.String(description='Secret key of the TObject.'),
+    'permission': fields.Integer(description='10:owner, 5:admin, 0:standard')
+})
 
 
 @obj_ns.route('/<string:oid>/')
 class TObjectView(Resource):
 
+    @api.doc('Get TObject children.', parser=obj_parser)
+    @api.marshal_list_with(obj_model, envelope='obj_list')
     def get(self, oid):
         """
         Get the child TObjects of Current TObject
         """
-        return 'GET'
+        obj = handler.get_obj(oid, obj_parser)
+        return handler.handle_obj_get(obj)
 
     def post(self, oid):
         """
