@@ -90,6 +90,8 @@ class TObjectView(Resource):
     def post(self, oid):
         """
         Add child TObjects for current TObject
+        children example:
+        [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
         """
         return handler.handle_obj_post(oid, obj_parser)
 
@@ -97,6 +99,10 @@ class TObjectView(Resource):
     def put(self, oid):
         """
         Replace all child TObjects for current TObject
+        children example:
+        [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
+        oid example:
+        de593be7-0ace-4b3e-84f5-d21ece36a6f6,cf15ee45-0e77-43d3-ab1b-0efa2402412a
         """
         return handler.handle_obj_replace(oid, obj_parser)
 
@@ -104,6 +110,8 @@ class TObjectView(Resource):
     def delete(self, oid):
         """
         Delete all child TObjects for current TObject
+        oid example:
+        de593be7-0ace-4b3e-84f5-d21ece36a6f6,cf15ee45-0e77-43d3-ab1b-0efa2402412a
         """
         return handler.handle_obj_delete(oid, obj_parser)
 
