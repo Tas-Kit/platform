@@ -56,11 +56,16 @@ class MiniAppView(Resource):
 
 obj_ns = api.namespace('tobject', description='TObject level operation namespace.')
 
+obj_get_parser = reqparse.RequestParser()
+obj_get_parser.add_argument('uid', type=str, location='cookies')
+obj_get_parser.add_argument('key', required=True, type=str, location='headers')
+
+
 obj_parser = reqparse.RequestParser()
 obj_parser.add_argument('uid', type=str, location='cookies')
-obj_parser.add_argument('MiniAppKey', required=True, type=str, location='headers')
+obj_parser.add_argument('key', required=True, type=str, location='headers')
 obj_parser.add_argument('children', type=str, location='form')
-obj_parser.add_argument('labels', type=list, location='form')
+obj_parser.add_argument('oid_list', type=str, location='form')
 
 obj_model = api.model('TObject', {
     'oid': fields.String(description='TObject ID.'),
@@ -74,32 +79,33 @@ obj_model = api.model('TObject', {
 @obj_ns.route('/<string:oid>/')
 class TObjectView(Resource):
 
-    @api.doc('Get TObject children.', parser=obj_parser)
-    @api.marshal_list_with(obj_model, envelope='obj_list')
+    @api.doc('Get children of a TObject.', parser=obj_get_parser)
     def get(self, oid):
         """
         Get the child TObjects of Current TObject
         """
-        obj = handler.get_obj(oid, obj_parser)
-        return handler.handle_obj_get(obj)
+        return handler.handle_obj_get(oid, obj_parser)
 
+    @api.doc('Add children to a TObject.', parser=obj_parser)
     def post(self, oid):
         """
         Add child TObjects for current TObject
         """
-        return 'POST'
+        return handler.handle_obj_post(oid, obj_parser)
 
+    @api.doc('Replace children of a TObject.', parser=obj_parser)
     def put(self, oid):
         """
         Replace all child TObjects for current TObject
         """
-        return 'PUT'
+        return handler.handle_obj_replace(oid, obj_parser)
 
+    @api.doc('Delete children of a TObject.', parser=obj_parser)
     def delete(self, oid):
         """
         Delete all child TObjects for current TObject
         """
-        return 'DELETE'
+        return handler.handle_obj_delete(oid, obj_parser)
 
     def patch(self, oid):
         """
