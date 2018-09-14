@@ -5,53 +5,69 @@ from .utils import handle_error
 from .models import User, MiniApp, TObject
 from .constants import ERROR_CODE, ROLE
 
+graph_obj_map = {
+    User: {
+        'model_name': 'User',
+        'id_name': 'uid',
+        'error_code': ERROR_CODE.USER_NOT_FIND
+    },
+    TObject: {
+        'model_name': 'TObject',
+        'id_name': 'oid',
+        'error_code': ERROR_CODE.TOBJECT_NOT_FIND
+    },
+    MiniApp: {
+        'model_name': 'MiniApp',
+        'id_name': 'aid',
+        'error_code': ERROR_CODE.APP_NOT_FIND
+    },
+}
 
-def get_user(uid):
+
+def get_graph_obj(_id, model):
     try:
-        # TODO assert no label TObject
-        return User.match(db).where("_.uid = '{uid}'".format(uid=uid)).first()
+        obj_map = graph_obj_map[model]
+        obj = model.match(db).where("_.{id_name} = '{_id}'"
+                                    .format(_id=_id, **obj_map)).first()
+        if obj is None:
+            handle_error('Unable to find {model_name} with given {id_name} "{_id}"'
+                         .format(_id=_id, **obj_map), obj_map['error_code'])
+        return obj
     except Exception as e:
-        handle_error(e, ERROR_CODE.USER_NOT_FIND)
-
-
-def get_tobject(oid):
-    try:
-        # TODO assert no label TObject
-        return TObject.match(db).where("_.oid = '{oid}'".format(oid=oid)).first()
-    except Exception as e:
-        handle_error(e, ERROR_CODE.TOBJECT_NOT_FIND)
-
-
-def get_app(aid):
-    try:
-        return MiniApp.match(db, aid).where("_.aid = '{aid}'".format(aid=aid)).first()
-    except Exception as e:
-        handle_error(e, ERROR_CODE.APP_NOT_FIND)
+        handle_error(e, ERROR_CODE.NEO4J_DATABASE_ERROR)
 
 
 def get_platform_root_key(uid):
-    user = get_user(uid)
+    user = get_graph_obj(uid, User)
     return {
         'platform_root_key': user.generate_platform_root_key()
     }
 
 
-def get_mini_app_key(uid, aid, platform_root_key):
-    user = get_user(uid)
+def get_mini_app(uid, aid, platform_root_key):
+    user = get_graph_obj(uid, User)
     user.verify_key(platform_root_key)
-    app = get_app(aid)
+    app = get_graph_obj(aid, MiniApp)
     return {
-        'mini_app_key': user.generate_app_key(app)
+        'mini_app': app.serialize(user)
+    }
+
+
+def get_mini_apps(uid, platform_root_key):
+    user = get_graph_obj(uid, User)
+    user.verify_key(platform_root_key)
+    return {
+        'mini_apps': [app.serialize(user) for app in list(user.apps)]
     }
 
 
 def get_obj_by_id(oid, data):
     if oid == 'root':
-        obj = get_app(data['_id'])
+        obj = get_graph_obj(data['_id'], MiniApp)
     elif oid != data['_id']:
         handle_error('Object ID does not match', ERROR_CODE.ID_NOT_MATCH)
     else:
-        obj = get_tobject(data['_id'])
+        obj = get_graph_obj(data['_id'], TObject)
     return obj
 
 
@@ -59,7 +75,7 @@ def handle_obj_params(oid, obj_parser):
     args = obj_parser.parse_args()
     uid = args['uid']
     key = args['key']
-    user = get_user(uid)
+    user = get_graph_obj(uid, User)
     data = user.verify_key(key)
     obj = get_obj_by_id(oid, data)
     params = {
@@ -110,14 +126,18 @@ def execute_obj_delete(obj, role, oid_list):
 
 @process_obj_params
 def handle_obj_delete(obj, role, oid_list, **kwargs):
+    return execute_obj_delete(obj, role, oid_list)
+
+
+def execute_obj_replace(user, obj, role, oid_list, children):
     execute_obj_delete(obj, role, oid_list)
+    db.pull(obj)
+    return execute_obj_post(user, obj, role, children)
 
 
 @process_obj_params
 def handle_obj_replace(user, obj, role, oid_list, children, **kwargs):
-    execute_obj_delete(obj, role, oid_list)
-    db.pull(obj)
-    return execute_obj_post(user, obj, role, children)
+    return execute_obj_replace(user, obj, role, oid_list, children)
 
 
 def execute_obj_post(user, obj, role, children):

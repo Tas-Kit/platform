@@ -43,15 +43,29 @@ app_parser.add_argument('PlatformRootKey', required=True, type=str, location='he
 @app_ns.route('/<string:aid>/')
 class MiniAppView(Resource):
 
-    @api.doc('Get MiniApp key', parser=app_parser)
+    @api.doc('Get MiniApp', parser=app_parser)
     def get(self, aid):
         """
-        Get the child TObjects of Current TObject
+        Get the child TObjects of Current MiniApp
         """
         args = app_parser.parse_args()
         uid = args['uid']
         platform_root_key = args['PlatformRootKey']
-        return handler.get_mini_app_key(uid, aid, platform_root_key)
+        return handler.get_mini_app(uid, aid, platform_root_key)
+
+
+@app_ns.route('/')
+class MiniAppListView(Resource):
+
+    @api.doc('Get All MiniApps', parser=app_parser)
+    def get(self):
+        """
+        Get All MiniApps the user have.
+        """
+        args = app_parser.parse_args()
+        uid = args['uid']
+        platform_root_key = args['PlatformRootKey']
+        return handler.get_mini_apps(uid, platform_root_key)
 
 
 obj_ns = api.namespace('tobject', description='TObject level operation namespace.')

@@ -64,11 +64,19 @@ class MiniApp(GraphObject):
     users = RelatedFrom("User", "HasApp")
     children = RelatedTo(TObject, "Has")
 
+    def serialize(self, user):
+        return {
+            'aid': self.aid,
+            'name': self.name,
+            'app': self.app,
+            'key': user.generate_app_key(self)
+        }
+
 
 class User(GraphObject):
     __primarykey__ = "uid"
     uid = Property()
-    has = RelatedTo(MiniApp, "HasApp")
+    apps = RelatedTo(MiniApp, "HasApp")
     share = RelatedTo(TObject, "Share")
 
     def verify_key(self, key):
@@ -96,7 +104,7 @@ class User(GraphObject):
         return app_key
 
     def get_role(self, app):
-        role = self.has.get(app, 'role')
+        role = self.apps.get(app, 'role')
         if role is None:
             handle_error('Unable to find app for current user.', ERROR_CODE.NOT_HAVE_APP)
         return role
