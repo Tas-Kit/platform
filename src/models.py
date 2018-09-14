@@ -1,8 +1,7 @@
 from py2neo.ogm import GraphObject, Property, RelatedFrom, RelatedTo
 import time
-import json
 import uuid
-from .utils import handle_error, encrypt, decrypt
+from src import utils
 from settings import SIGNATURE_DURATION
 from .constants import ERROR_CODE
 
@@ -46,11 +45,11 @@ class TObject(GraphObject):
 
     def serialize(self, user, role):
         message = user.get_message(self.oid, role)
-        key = encrypt(message)
+        key = utils.encrypt(message)
         return {
             'oid': self.oid,
             'labels': self.labels,
-            'properties': json.dumps(dict(self.__node__)),
+            'properties': dict(self.__node__),
             'key': key,
             'role': role
         }
@@ -81,13 +80,13 @@ class User(GraphObject):
 
     def verify_key(self, key):
         try:
-            data = decrypt(key)
+            data = utils.decrypt(key)
         except Exception as e:
-            handle_error(e, ERROR_CODE.UNABLE_TO_DECRYPT)
+            utils.handle_error(e, ERROR_CODE.UNABLE_TO_DECRYPT)
         if self.uid != data['uid']:
-            handle_error("User does not match the platform root key.", ERROR_CODE.USER_NOT_MATCH)
+            utils.handle_error("User does not match the platform root key.", ERROR_CODE.USER_NOT_MATCH)
         if int(time.time()) > data['exp']:
-            handle_error("Key expired.", ERROR_CODE.KEY_EXPIRED)
+            utils.handle_error("Key expired.", ERROR_CODE.KEY_EXPIRED)
         return data
 
     def generate_platform_root_key(self):
@@ -95,18 +94,18 @@ class User(GraphObject):
             'uid': self.uid,
             'exp': int(time.time()) + SIGNATURE_DURATION
         }
-        return encrypt(data)
+        return utils.encrypt(data)
 
     def generate_app_key(self, app):
         role = self.get_role(app)
         message = self.get_message(app.aid, role)
-        app_key = encrypt(message)
+        app_key = utils.encrypt(message)
         return app_key
 
     def get_role(self, app):
         role = self.apps.get(app, 'role')
         if role is None:
-            handle_error('Unable to find app for current user.', ERROR_CODE.NOT_HAVE_APP)
+            utils.handle_error('Unable to find app for current user.', ERROR_CODE.NOT_HAVE_APP)
         return role
 
     def get_message(self, _id, role):
