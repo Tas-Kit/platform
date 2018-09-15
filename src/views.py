@@ -25,8 +25,7 @@ class InternalView(Resource):
     @api.doc('Get Platform root key', parser=uid_parser)
     def get(self):
         """
-        Get the child TObjects of Current TObject
-        If it is the mini app root, pass 'root' for oid
+        Get the platform root key.
         """
         args = uid_parser.parse_args()
         uid = args['uid']
