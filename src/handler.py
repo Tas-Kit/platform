@@ -30,8 +30,13 @@ def get_graph_obj(_id, model):
         obj = model.match(db).where("_.{id_name} = '{_id}'"
                                     .format(_id=_id, **obj_map)).first()
         if obj is None:
-            handle_error('Unable to find {model_name} with given {id_name} "{_id}"'
-                         .format(_id=_id, **obj_map), obj_map['error_code'])
+            if model == User:
+                obj = User()
+                obj.uid = _id
+                db.push(obj)
+            else:
+                handle_error('Unable to find {model_name} with given {id_name} "{_id}"'
+                             .format(_id=_id, **obj_map), obj_map['error_code'])
         return obj
     except Exception as e:
         handle_error(e, ERROR_CODE.NEO4J_DATABASE_ERROR)
