@@ -58,11 +58,10 @@ def get_mini_app(uid, aid, platform_root_key):
     }
 
 
-def get_mini_apps(uid, platform_root_key):
+def get_mini_apps(uid):
     user = get_graph_obj(uid, User)
-    user.verify_key(platform_root_key)
     return {
-        'mini_apps': [app.serialize(user) for app in list(user.apps)]
+        'mini_apps': [app.serialize() for app in list(user.apps)]
     }
 
 
@@ -168,4 +167,4 @@ def execute_obj_post(user, obj, role, children):
 
 @process_obj_params
 def handle_obj_post(user, obj, role, children, **kwargs):
-    execute_obj_post(user, obj, role, children)
+    return execute_obj_post(user, obj, role, children)

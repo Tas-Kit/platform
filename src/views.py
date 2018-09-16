@@ -36,7 +36,7 @@ app_ns = api.namespace('miniapp', description='Mini App level operation namespac
 
 app_parser = reqparse.RequestParser()
 app_parser.add_argument('uid', type=str, location='cookies')
-app_parser.add_argument('PlatformRootKey', required=True, type=str, location='headers')
+app_parser.add_argument('PlatformRootKey', required=False, type=str, location='headers')
 
 
 @app_ns.route('/<string:aid>/')
@@ -63,8 +63,7 @@ class MiniAppListView(Resource):
         """
         args = app_parser.parse_args()
         uid = args['uid']
-        platform_root_key = args['PlatformRootKey']
-        return handler.get_mini_apps(uid, platform_root_key)
+        return handler.get_mini_apps(uid)
 
 
 obj_ns = api.namespace('tobject', description='TObject level operation namespace.')

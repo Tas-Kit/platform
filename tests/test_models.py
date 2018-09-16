@@ -8,9 +8,6 @@ from werkzeug.exceptions import BadRequest
 
 class TestUser(object):
 
-	def test_get_role():
-
-
     @patch('src.utils.encrypt', return_value='app_key')
     @patch('src.models.User.get_message', return_value='message')
     @patch('src.models.User.get_role', return_value=ROLE.ADMIN)

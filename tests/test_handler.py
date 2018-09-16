@@ -227,10 +227,10 @@ def test_get_mini_apps(mock_get_graph_obj):
     app2.serialize.return_value = 'app2'
     user.apps = [app1, app2]
     mock_get_graph_obj.return_value = user
-    assert handler.get_mini_apps('test_uid', 'test_platform_root_key') == {
+    assert handler.get_mini_apps('test_uid') == {
         'mini_apps': ['app1', 'app2']
     }
-    user.verify_key.assert_called_once_with('test_platform_root_key')
+    user.verify_key.assert_not_called()
     mock_get_graph_obj.assert_called_once_with('test_uid', User)
 
 
@@ -260,17 +260,24 @@ def test_get_platform_root_key(mock_get_graph_obj):
 
 def test_get_graph_obj_not_exist():
     with pytest.raises(BadRequest):
-        handler.get_graph_obj('none existing uid', User)
+        handler.get_graph_obj('none existing aid', MiniApp)
+
+
+def test_get_graph_obj_user_not_exist():
+    uid = str(uuid.uuid4())
+    u = handler.get_graph_obj(uid, User)
+    assert u.uid == uid
+    db.delete(u)
 
 
 def test_get_graph_obj_exist():
-    u = User()
-    uid = str(uuid.uuid4())
-    u.uid = uid
-    db.push(u)
-    db.pull(u)
-    assert u == handler.get_graph_obj(uid, User)
-    db.delete(u)
+    app = MiniApp()
+    aid = str(uuid.uuid4())
+    app.aid = aid
+    db.push(app)
+    db.pull(app)
+    assert app == handler.get_graph_obj(aid, MiniApp)
+    db.delete(app)
 
 
 @patch('src.handler.serialize_objs', return_value='serialize_results')
