@@ -66,7 +66,7 @@ class MiniAppListView(Resource):
         return handler.get_mini_apps(uid)
 
 
-obj_ns = api.namespace('tobject', description='TObject level operation namespace.')
+obj_ns = api.namespace('tobject', description='TObject level operation namespace. NOTE: the root TObject (MiniApp) has the oid "root".')
 
 obj_get_parser = reqparse.RequestParser()
 obj_get_parser.add_argument('uid', type=str, location='cookies')
