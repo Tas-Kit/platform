@@ -336,7 +336,7 @@ def test_handle_obj_params(mock_get_graph_obj,
     user.verify_key.return_value = data
     mock_get_obj_by_id.return_value = obj
 
-    oid_list = 'oid1,oid2'
+    oid_list = ['oid1', 'oid2']
     children = [
         {
             'labels': ['People', 'Worker'],
@@ -351,7 +351,7 @@ def test_handle_obj_params(mock_get_graph_obj,
         'uid': 'test_uid',
         'key': 'test_key',
         'oid_list': oid_list,
-        'children': json.dumps(children)
+        'children': children
     }
     params = handler.handle_obj_params('test_oid', parser)
     mock_get_graph_obj.assert_called_once_with('test_uid', User)

@@ -85,12 +85,14 @@ def handle_obj_params(oid, obj_parser):
     params = {
         'user': user,
         'obj': obj,
-        'role': data['role']
+        'role': data['role'],
+        'children': [],
+        'oid_list': []
     }
     if 'oid_list' in args and args['oid_list'] is not None:
-        params['oid_list'] = args['oid_list'].split(',')
+        params['oid_list'] = args['oid_list']
     if 'children' in args and args['children'] is not None:
-        params['children'] = json.loads(args['children'])
+        params['children'] = args['children']
     return params
 
 
@@ -147,7 +149,7 @@ def handle_obj_replace(user, obj, role, oid_list, children, **kwargs):
 def execute_obj_post(user, obj, role, children):
     """
     Children example:
-    [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
+    [{"labels": ["Person"], "properties": {"age":10, "name":"owen"}}]
     """
     if role < ROLE.ADMIN:
         handle_error('Permission deny. You do not have write permission.', ERROR_CODE.NO_WRITE_PERMISSION)
