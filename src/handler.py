@@ -106,7 +106,7 @@ def process_obj_params(func):
 
 
 def serialize_objs(user, objs, role):
-    return [obj.serialize(user, role) for obj in objs]
+    return {obj.oid: obj.serialize(user, role) for obj in objs}
 
 
 @process_obj_params

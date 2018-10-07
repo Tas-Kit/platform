@@ -174,13 +174,13 @@ def test_execute_obj_delete_no_permission():
 
 
 def test_serialize_objs():
-    obj1 = MagicMock()
-    obj2 = MagicMock()
+    obj1 = MagicMock(oid='oid1')
+    obj2 = MagicMock(oid='oid2')
     obj1.serialize.return_value = 'obj1'
     obj2.serialize.return_value = 'obj2'
     objs = [obj1, obj2]
     user = MagicMock()
-    assert ['obj1', 'obj2'] == handler.serialize_objs(user, objs, ROLE.ADMIN)
+    assert {'oid1': 'obj1', 'oid2': 'obj2'} == handler.serialize_objs(user, objs, ROLE.ADMIN)
     obj1.serialize.assert_called_once_with(user, ROLE.ADMIN)
     obj2.serialize.assert_called_once_with(user, ROLE.ADMIN)
 
