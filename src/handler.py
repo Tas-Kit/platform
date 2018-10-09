@@ -1,7 +1,7 @@
 import json
 from py2neo import Subgraph
 from . import db
-from .utils import handle_error
+from .utils import handle_error, assert_admin, assert_higher_permission
 from .models import User, MiniApp, TObject
 from .constants import ERROR_CODE, ROLE
 
@@ -115,8 +115,7 @@ def handle_obj_get(user, obj, role, **kwargs):
 
 
 def execute_obj_delete(obj, role, oid_list):
-    if role < ROLE.ADMIN:
-        handle_error('Permission deny. You do not have write permission.', ERROR_CODE.NO_WRITE_PERMISSION)
+    assert_admin(role)
     children = [child for child in list(obj.children) if child.oid in set(oid_list)]
     all_children = []
     for child in children:
@@ -151,8 +150,7 @@ def execute_obj_post(user, obj, role, children):
     Children example:
     [{"labels": ["Person"], "properties": {"age":10, "name":"owen"}}]
     """
-    if role < ROLE.ADMIN:
-        handle_error('Permission deny. You do not have write permission.', ERROR_CODE.NO_WRITE_PERMISSION)
+    assert_admin(role)
     objs = []
     for child in children:
         child_obj = TObject.new(child['labels'], child['properties'])
@@ -170,3 +168,39 @@ def execute_obj_post(user, obj, role, children):
 @process_obj_params
 def handle_obj_post(user, obj, role, children, **kwargs):
     return execute_obj_post(user, obj, role, children)
+
+
+def execute_obj_patch(obj, role, target_user, target_role):
+    """
+    Grant target user with target role
+    """
+    assert_admin(role)
+    assert_higher_permission(role, target_role)
+    obj_role = target_user.share.get(obj, 'role')
+    if obj_role is not None:
+        assert_higher_permission(role, obj_role)
+    if target_role < ROLE.STANDARD:
+        target_user.share.remove(obj)
+    else:
+        target_user.share.update(obj, role=target_role)
+    db.push(target_user)
+    return 'SUCCESS'
+
+def handle_obj_patch(oid, obj_parser):
+    if oid == 'root':
+        handle_error('Unable to share app.', ERROR_CODE.UNABLE_TO_SHARE_APP)
+    args = obj_parser.parse_args()
+    uid = args['uid']
+    key = args['key']
+    user = get_graph_obj(uid, User)
+    data = user.verify_key(key)
+    obj = get_obj_by_id(oid, data)
+    params = {
+        'obj': obj,
+        'role': data['role'],
+        'target_user': get_graph_obj(args['target_uid'], User),
+        'target_role': args['target_role']
+    }
+    return {
+        'result': execute_obj_patch(**params)
+    }

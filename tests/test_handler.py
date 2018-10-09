@@ -362,3 +362,54 @@ def test_handle_obj_params(mock_get_graph_obj,
         'oid_list': ['oid1', 'oid2'],
         'children': children
     }
+
+@patch('src.db.push')
+def test_execute_obj_patch_update(mock_push):
+    target_user = MagicMock()
+    target_user.share.get.return_value = 0
+    assert handler.execute_obj_patch(MagicMock(), 10, target_user, 5) == 'SUCCESS'
+    target_user.share.update.assert_called_once()
+
+@patch('src.db.push')
+def test_execute_obj_patch_remove(mock_push):
+    target_user = MagicMock()
+    target_user.share.get.return_value = 0
+    assert handler.execute_obj_patch(MagicMock(), 10, target_user, -1) == 'SUCCESS'
+    target_user.share.remove.assert_called_once()
+
+@patch('src.db.push')
+def test_execute_obj_patch_no_enough_permission(mock_push):
+    target_user = MagicMock()
+    target_user.share = MagicMock()
+    target_user.share.get.return_value = 5
+    with pytest.raises(BadRequest):
+        handler.execute_obj_patch(MagicMock(), 5, target_user, 0) == 'SUCCESS'
+
+
+def test_handle_obj_patch_root():
+    with pytest.raises(BadRequest):
+        handler.handle_obj_patch('root', '')
+
+
+@patch('src.handler.get_obj_by_id', return_value='obj')
+@patch('src.handler.get_graph_obj')
+@patch('src.handler.execute_obj_patch', return_value='hello')
+def test_handle_obj_patch(mock_execute_obj_patch, mock_get_graph_obj, mock_get_obj_by_id):
+    user1 = MagicMock()
+    user1.verify_key.return_value = {
+        'role': 5
+    }
+    user2 = MagicMock()
+    mock_get_graph_obj.side_effect = [user1, user2]
+    arg_parser = MagicMock()
+    arg_parser.parse_args.return_value = {
+        'uid': 'myuid',
+        'key': 'mykey',
+        'target_uid': 'mytarget_uid',
+        'target_role': 0
+    }
+    assert handler.handle_obj_patch('oid', arg_parser) == {
+        'result': 'hello'
+    }
+    mock_execute_obj_patch.assert_called_once_with(
+        obj='obj', role=5, target_user=user2, target_role=0)

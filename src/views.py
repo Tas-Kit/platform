@@ -79,6 +79,12 @@ obj_parser.add_argument('key', required=True, type=str, location='headers')
 obj_parser.add_argument('children', type=list, location='json')
 obj_parser.add_argument('oid_list', type=list, location='json')
 
+obj_patch_parser = reqparse.RequestParser()
+obj_patch_parser.add_argument('uid', type=str, location='cookies')
+obj_patch_parser.add_argument('key', required=True, type=str, location='headers')
+obj_patch_parser.add_argument('target_uid', type=str, required=True, location='json')
+obj_patch_parser.add_argument('target_role', type=int, required=True, location='json')
+
 obj_model = api.model('TObject', {
     'oid': fields.String(description='TObject ID.'),
     'properties': fields.String(description='The actual properties (json encoded) in the customer object.'),
@@ -127,8 +133,9 @@ class TObjectView(Resource):
         """
         return handler.handle_obj_delete(oid, obj_parser)
 
+    @api.doc('Grant user a permission of a TObject.', parser=obj_patch_parser)
     def patch(self, oid):
         """
         Change users access for parent TObject
         """
-        return 'TO BE IMPLEMENTED'
+        return handler.handle_obj_patch(oid, obj_patch_parser)
