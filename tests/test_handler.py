@@ -187,34 +187,50 @@ def test_serialize_objs():
 
 @patch('src.handler.get_graph_obj')
 def test_get_obj_by_id_get_wrong_obj(mock_get_graph_obj):
+    user = MagicMock()
     obj = MagicMock()
     mock_get_graph_obj.return_value = obj
     data = {
         '_id': 'test_id'
     }
     with pytest.raises(BadRequest):
-        handler.get_obj_by_id('wrong_id', data)
+        handler.get_obj_by_id(user, 'wrong_id', data)
+
+@patch('src.utils.assert_standard')
+@patch('src.handler.get_graph_obj')
+def test_get_obj_by_id_platform(mock_get_graph_obj, mock_assert_standard):
+    user = MagicMock()
+    user.share.get.return_value = 5
+    obj = MagicMock()
+    mock_get_graph_obj.return_value = obj
+    data = {
+        '_id': 'platform'
+    }
+    assert obj is handler.get_obj_by_id(user, 'wrong_id', data)
+    assert data['role'] == 5
 
 
 @patch('src.handler.get_graph_obj')
 def test_get_obj_by_id_get_obj(mock_get_graph_obj):
+    user = MagicMock()
     obj = MagicMock()
     mock_get_graph_obj.return_value = obj
     data = {
         '_id': 'test_id'
     }
-    assert obj == handler.get_obj_by_id('test_id', data)
+    assert obj == handler.get_obj_by_id(user, 'test_id', data)
     mock_get_graph_obj.assert_called_once_with('test_id', TObject)
 
 
 @patch('src.handler.get_graph_obj')
 def test_get_obj_by_id_get_app(mock_get_graph_obj):
+    user = MagicMock()
     obj = MagicMock()
     mock_get_graph_obj.return_value = obj
     data = {
         '_id': 'test_id'
     }
-    assert obj == handler.get_obj_by_id('root', data)
+    assert obj == handler.get_obj_by_id(user, 'root', data)
     mock_get_graph_obj.assert_called_once_with('test_id', MiniApp)
 
 

@@ -15,7 +15,13 @@ def handle_error(error, error_code):
     raise bad_request
 
 
+def assert_standard(role):
+    if role is None or role < ROLE.STANDARD:
+        handle_error('Permission deny. You do not have read permission.', ERROR_CODE.NO_READ_PERMISSION)
+
+
 def assert_admin(role):
+    assert_standard(role)
     if role < ROLE.ADMIN:
         handle_error('Permission deny. You do not have write permission.', ERROR_CODE.NO_WRITE_PERMISSION)
 

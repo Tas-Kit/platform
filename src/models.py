@@ -92,6 +92,7 @@ class User(GraphObject):
     def generate_platform_root_key(self):
         data = {
             'uid': self.uid,
+            '_id': 'platform',
             'exp': int(time.time()) + SIGNATURE_DURATION
         }
         return utils.encrypt(data)

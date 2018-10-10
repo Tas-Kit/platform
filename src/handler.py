@@ -1,7 +1,7 @@
 import json
 from py2neo import Subgraph
 from . import db
-from .utils import handle_error, assert_admin, assert_higher_permission
+from .utils import handle_error, assert_admin, assert_standard, assert_higher_permission
 from .models import User, MiniApp, TObject
 from .constants import ERROR_CODE, ROLE
 
@@ -65,9 +65,14 @@ def get_mini_apps(uid):
     }
 
 
-def get_obj_by_id(oid, data):
+def get_obj_by_id(user, oid, data):
     if oid == 'root':
         obj = get_graph_obj(data['_id'], MiniApp)
+    elif data['_id'] == 'platform':
+        obj = get_graph_obj(oid, TObject)
+        role = user.share.get(obj, 'role')
+        assert_standard(role)
+        data['role'] = role
     elif oid != data['_id']:
         handle_error('Object ID does not match', ERROR_CODE.ID_NOT_MATCH)
     else:
@@ -81,7 +86,7 @@ def handle_obj_params(oid, obj_parser):
     key = args['key']
     user = get_graph_obj(uid, User)
     data = user.verify_key(key)
-    obj = get_obj_by_id(oid, data)
+    obj = get_obj_by_id(user, oid, data)
     params = {
         'user': user,
         'obj': obj,
@@ -194,7 +199,7 @@ def handle_obj_patch(oid, obj_parser):
     key = args['key']
     user = get_graph_obj(uid, User)
     data = user.verify_key(key)
-    obj = get_obj_by_id(oid, data)
+    obj = get_obj_by_id(user, oid, data)
     params = {
         'obj': obj,
         'role': data['role'],
