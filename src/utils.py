@@ -1,5 +1,5 @@
 from . import blowfish
-import base64
+import base62
 import json
 from .constants import ERROR_CODE, ROLE
 from werkzeug.exceptions import BadRequest
@@ -35,10 +35,10 @@ def encrypt(message):
     message = json.dumps(message).encode('utf-8')
     space = (int(len(message) / 8) + 1) * 8
     code = blowfish.encrypt(message.ljust(space))
-    return base64.b64encode(code).decode('utf-8')
+    return base62.encodebytes(code)
 
 
 def decrypt(code):
-    code = base64.b64decode(code.encode('utf-8'))
+    code = base62.decodebytes(code)
     message = blowfish.decrypt(code).decode('utf-8')
     return json.loads(message)
