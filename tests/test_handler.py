@@ -94,8 +94,8 @@ def test_execute_obj_replace(mock_execute_obj_delete, mock_execute_obj_post, moc
 
 
 @patch('src.handler.Subgraph')
-@patch('src.db.delete', side_effect=Exception)
-def test_execute_obj_delete_error(mock_delete, mock_subgraph):
+@patch('src.db.run', side_effect=Exception)
+def test_execute_obj_delete_error(mock_run, mock_subgraph):
     obj = MagicMock()
     child1 = MagicMock()
     child2 = MagicMock()
@@ -130,8 +130,8 @@ def test_execute_obj_delete_error(mock_delete, mock_subgraph):
 
 
 @patch('src.handler.Subgraph')
-@patch('src.db.delete')
-def test_execute_obj_delete_success(mock_delete, mock_subgraph):
+@patch('src.db.run')
+def test_execute_obj_delete_success(mock_run, mock_subgraph):
     obj = MagicMock()
     child1 = MagicMock()
     child2 = MagicMock()
@@ -162,8 +162,7 @@ def test_execute_obj_delete_success(mock_delete, mock_subgraph):
     subgraph = MagicMock()
     mock_subgraph.return_value = subgraph
     assert 'SUCCESS' == handler.execute_obj_delete(obj, ROLE.ADMIN, oid_list)
-    mock_delete.assert_called_once_with(subgraph)
-    mock_subgraph.assert_called_once_with(['node1', 'node2', 'node5', 'node6', 'child1', 'child3'])
+    mock_run.assert_called_once_with("MATCH (a:TObject)-[*0..]->(x:TObject) WHERE a.oid IN ['oid0', 'oid1', 'oid3', 'oid4'] DETACH DELETE x")
 
 
 def test_execute_obj_delete_no_permission():

@@ -121,14 +121,9 @@ def handle_obj_get(user, obj, role, **kwargs):
 
 def execute_obj_delete(obj, role, oid_list):
     assert_admin(role)
-    children = [child for child in list(obj.children) if child.oid in set(oid_list)]
-    all_children = []
-    for child in children:
-        all_children += child.get_all_children()
-    all_children += children
-    subgraph = Subgraph([child.__node__ for child in all_children])
     try:
-        db.delete(subgraph)
+        db.run("MATCH (a:TObject)-[*0..]->(x:TObject) WHERE a.oid IN {oid_list} DETACH DELETE x"
+            .format(oid_list=str(oid_list)))
     except Exception as e:
         handle_error(e, ERROR_CODE.NEO4J_PUSH_FAILURE)
     return 'SUCCESS'
