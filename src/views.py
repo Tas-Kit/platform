@@ -36,7 +36,7 @@ app_ns = api.namespace('miniapp', description='Mini App level operation namespac
 
 app_parser = reqparse.RequestParser()
 app_parser.add_argument('uid', type=str, location='cookies')
-app_parser.add_argument('PlatformRootKey', required=True, type=str, location='headers')
+app_parser.add_argument('PlatformRootKey', required=False, type=str, location='headers')
 
 
 @app_ns.route('/<string:aid>/')
@@ -63,11 +63,10 @@ class MiniAppListView(Resource):
         """
         args = app_parser.parse_args()
         uid = args['uid']
-        platform_root_key = args['PlatformRootKey']
-        return handler.get_mini_apps(uid, platform_root_key)
+        return handler.get_mini_apps(uid)
 
 
-obj_ns = api.namespace('tobject', description='TObject level operation namespace.')
+obj_ns = api.namespace('tobject', description='TObject level operation namespace. NOTE: the root TObject (MiniApp) has the oid "root".')
 
 obj_get_parser = reqparse.RequestParser()
 obj_get_parser.add_argument('uid', type=str, location='cookies')
@@ -77,8 +76,14 @@ obj_get_parser.add_argument('key', required=True, type=str, location='headers')
 obj_parser = reqparse.RequestParser()
 obj_parser.add_argument('uid', type=str, location='cookies')
 obj_parser.add_argument('key', required=True, type=str, location='headers')
-obj_parser.add_argument('children', type=str, location='form')
-obj_parser.add_argument('oid_list', type=str, location='form')
+obj_parser.add_argument('children', type=list, location='json')
+obj_parser.add_argument('oid_list', type=list, location='json')
+
+obj_patch_parser = reqparse.RequestParser()
+obj_patch_parser.add_argument('uid', type=str, location='cookies')
+obj_patch_parser.add_argument('key', required=True, type=str, location='headers')
+obj_patch_parser.add_argument('target_uid', type=str, required=True, location='json')
+obj_patch_parser.add_argument('target_role', type=int, required=True, location='json')
 
 obj_model = api.model('TObject', {
     'oid': fields.String(description='TObject ID.'),
@@ -102,7 +107,7 @@ class TObjectView(Resource):
     @api.doc('Add children to a TObject.', parser=obj_parser)
     def post(self, oid):
         """
-        Add child TObjects for current TObject
+        Add child TObjects for parent TObject
         children example:
         [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
         """
@@ -111,25 +116,26 @@ class TObjectView(Resource):
     @api.doc('Replace children of a TObject.', parser=obj_parser)
     def put(self, oid):
         """
-        Replace all child TObjects for current TObject
+        Replace all child TObjects for parent TObject
         children example:
         [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
         oid example:
-        de593be7-0ace-4b3e-84f5-d21ece36a6f6,cf15ee45-0e77-43d3-ab1b-0efa2402412a
+        ['de593be7-0ace-4b3e-84f5-d21ece36a6f6', 'cf15ee45-0e77-43d3-ab1b-0efa2402412a']
         """
         return handler.handle_obj_replace(oid, obj_parser)
 
     @api.doc('Delete children of a TObject.', parser=obj_parser)
     def delete(self, oid):
         """
-        Delete all child TObjects for current TObject
+        Delete all child TObjects for parent TObject
         oid example:
-        de593be7-0ace-4b3e-84f5-d21ece36a6f6,cf15ee45-0e77-43d3-ab1b-0efa2402412a
+        ['de593be7-0ace-4b3e-84f5-d21ece36a6f6', 'cf15ee45-0e77-43d3-ab1b-0efa2402412a']
         """
         return handler.handle_obj_delete(oid, obj_parser)
 
+    @api.doc('Grant user a permission of a TObject.', parser=obj_patch_parser)
     def patch(self, oid):
         """
-        Change users access for current TObject
+        Change users access for parent TObject
         """
-        return 'PATCH'
+        return handler.handle_obj_patch(oid, obj_patch_parser)

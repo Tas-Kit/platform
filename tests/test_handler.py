@@ -1,3 +1,4 @@
+# trigger build
 import json
 import uuid
 import pytest
@@ -94,8 +95,8 @@ def test_execute_obj_replace(mock_execute_obj_delete, mock_execute_obj_post, moc
 
 
 @patch('src.handler.Subgraph')
-@patch('src.db.delete', side_effect=Exception)
-def test_execute_obj_delete_error(mock_delete, mock_subgraph):
+@patch('src.db.run', side_effect=Exception)
+def test_execute_obj_delete_error(mock_run, mock_subgraph):
     obj = MagicMock()
     child1 = MagicMock()
     child2 = MagicMock()
@@ -130,8 +131,8 @@ def test_execute_obj_delete_error(mock_delete, mock_subgraph):
 
 
 @patch('src.handler.Subgraph')
-@patch('src.db.delete')
-def test_execute_obj_delete_success(mock_delete, mock_subgraph):
+@patch('src.db.run')
+def test_execute_obj_delete_success(mock_run, mock_subgraph):
     obj = MagicMock()
     child1 = MagicMock()
     child2 = MagicMock()
@@ -162,8 +163,7 @@ def test_execute_obj_delete_success(mock_delete, mock_subgraph):
     subgraph = MagicMock()
     mock_subgraph.return_value = subgraph
     assert 'SUCCESS' == handler.execute_obj_delete(obj, ROLE.ADMIN, oid_list)
-    mock_delete.assert_called_once_with(subgraph)
-    mock_subgraph.assert_called_once_with(['node1', 'node2', 'node5', 'node6', 'child1', 'child3'])
+    mock_run.assert_called_once_with("MATCH (a:TObject)-[*0..]->(x:TObject) WHERE a.oid IN ['oid0', 'oid1', 'oid3', 'oid4'] DETACH DELETE x")
 
 
 def test_execute_obj_delete_no_permission():
@@ -174,47 +174,63 @@ def test_execute_obj_delete_no_permission():
 
 
 def test_serialize_objs():
-    obj1 = MagicMock()
-    obj2 = MagicMock()
+    obj1 = MagicMock(oid='oid1')
+    obj2 = MagicMock(oid='oid2')
     obj1.serialize.return_value = 'obj1'
     obj2.serialize.return_value = 'obj2'
     objs = [obj1, obj2]
     user = MagicMock()
-    assert ['obj1', 'obj2'] == handler.serialize_objs(user, objs, ROLE.ADMIN)
+    assert {'oid1': 'obj1', 'oid2': 'obj2'} == handler.serialize_objs(user, objs, ROLE.ADMIN)
     obj1.serialize.assert_called_once_with(user, ROLE.ADMIN)
     obj2.serialize.assert_called_once_with(user, ROLE.ADMIN)
 
 
 @patch('src.handler.get_graph_obj')
 def test_get_obj_by_id_get_wrong_obj(mock_get_graph_obj):
+    user = MagicMock()
     obj = MagicMock()
     mock_get_graph_obj.return_value = obj
     data = {
         '_id': 'test_id'
     }
     with pytest.raises(BadRequest):
-        handler.get_obj_by_id('wrong_id', data)
+        handler.get_obj_by_id(user, 'wrong_id', data)
+
+@patch('src.utils.assert_standard')
+@patch('src.handler.get_graph_obj')
+def test_get_obj_by_id_platform(mock_get_graph_obj, mock_assert_standard):
+    user = MagicMock()
+    user.share.get.return_value = 5
+    obj = MagicMock()
+    mock_get_graph_obj.return_value = obj
+    data = {
+        '_id': 'platform'
+    }
+    assert obj is handler.get_obj_by_id(user, 'wrong_id', data)
+    assert data['role'] == 5
 
 
 @patch('src.handler.get_graph_obj')
 def test_get_obj_by_id_get_obj(mock_get_graph_obj):
+    user = MagicMock()
     obj = MagicMock()
     mock_get_graph_obj.return_value = obj
     data = {
         '_id': 'test_id'
     }
-    assert obj == handler.get_obj_by_id('test_id', data)
+    assert obj == handler.get_obj_by_id(user, 'test_id', data)
     mock_get_graph_obj.assert_called_once_with('test_id', TObject)
 
 
 @patch('src.handler.get_graph_obj')
 def test_get_obj_by_id_get_app(mock_get_graph_obj):
+    user = MagicMock()
     obj = MagicMock()
     mock_get_graph_obj.return_value = obj
     data = {
         '_id': 'test_id'
     }
-    assert obj == handler.get_obj_by_id('root', data)
+    assert obj == handler.get_obj_by_id(user, 'root', data)
     mock_get_graph_obj.assert_called_once_with('test_id', MiniApp)
 
 
@@ -227,10 +243,10 @@ def test_get_mini_apps(mock_get_graph_obj):
     app2.serialize.return_value = 'app2'
     user.apps = [app1, app2]
     mock_get_graph_obj.return_value = user
-    assert handler.get_mini_apps('test_uid', 'test_platform_root_key') == {
+    assert handler.get_mini_apps('test_uid') == {
         'mini_apps': ['app1', 'app2']
     }
-    user.verify_key.assert_called_once_with('test_platform_root_key')
+    user.verify_key.assert_not_called()
     mock_get_graph_obj.assert_called_once_with('test_uid', User)
 
 
@@ -260,17 +276,24 @@ def test_get_platform_root_key(mock_get_graph_obj):
 
 def test_get_graph_obj_not_exist():
     with pytest.raises(BadRequest):
-        handler.get_graph_obj('none existing uid', User)
+        handler.get_graph_obj('none existing aid', MiniApp)
+
+
+def test_get_graph_obj_user_not_exist():
+    uid = str(uuid.uuid4())
+    u = handler.get_graph_obj(uid, User)
+    assert u.uid == uid
+    db.delete(u)
 
 
 def test_get_graph_obj_exist():
-    u = User()
-    uid = str(uuid.uuid4())
-    u.uid = uid
-    db.push(u)
-    db.pull(u)
-    assert u == handler.get_graph_obj(uid, User)
-    db.delete(u)
+    app = MiniApp()
+    aid = str(uuid.uuid4())
+    app.aid = aid
+    db.push(app)
+    db.pull(app)
+    assert app == handler.get_graph_obj(aid, MiniApp)
+    db.delete(app)
 
 
 @patch('src.handler.serialize_objs', return_value='serialize_results')
@@ -329,7 +352,7 @@ def test_handle_obj_params(mock_get_graph_obj,
     user.verify_key.return_value = data
     mock_get_obj_by_id.return_value = obj
 
-    oid_list = 'oid1,oid2'
+    oid_list = ['oid1', 'oid2']
     children = [
         {
             'labels': ['People', 'Worker'],
@@ -344,7 +367,7 @@ def test_handle_obj_params(mock_get_graph_obj,
         'uid': 'test_uid',
         'key': 'test_key',
         'oid_list': oid_list,
-        'children': json.dumps(children)
+        'children': children
     }
     params = handler.handle_obj_params('test_oid', parser)
     mock_get_graph_obj.assert_called_once_with('test_uid', User)
@@ -355,3 +378,54 @@ def test_handle_obj_params(mock_get_graph_obj,
         'oid_list': ['oid1', 'oid2'],
         'children': children
     }
+
+@patch('src.db.push')
+def test_execute_obj_patch_update(mock_push):
+    target_user = MagicMock()
+    target_user.share.get.return_value = 0
+    assert handler.execute_obj_patch(MagicMock(), 10, target_user, 5) == 'SUCCESS'
+    target_user.share.update.assert_called_once()
+
+@patch('src.db.push')
+def test_execute_obj_patch_remove(mock_push):
+    target_user = MagicMock()
+    target_user.share.get.return_value = 0
+    assert handler.execute_obj_patch(MagicMock(), 10, target_user, -1) == 'SUCCESS'
+    target_user.share.remove.assert_called_once()
+
+@patch('src.db.push')
+def test_execute_obj_patch_no_enough_permission(mock_push):
+    target_user = MagicMock()
+    target_user.share = MagicMock()
+    target_user.share.get.return_value = 5
+    with pytest.raises(BadRequest):
+        handler.execute_obj_patch(MagicMock(), 5, target_user, 0) == 'SUCCESS'
+
+
+def test_handle_obj_patch_root():
+    with pytest.raises(BadRequest):
+        handler.handle_obj_patch('root', '')
+
+
+@patch('src.handler.get_obj_by_id', return_value='obj')
+@patch('src.handler.get_graph_obj')
+@patch('src.handler.execute_obj_patch', return_value='hello')
+def test_handle_obj_patch(mock_execute_obj_patch, mock_get_graph_obj, mock_get_obj_by_id):
+    user1 = MagicMock()
+    user1.verify_key.return_value = {
+        'role': 5
+    }
+    user2 = MagicMock()
+    mock_get_graph_obj.side_effect = [user1, user2]
+    arg_parser = MagicMock()
+    arg_parser.parse_args.return_value = {
+        'uid': 'myuid',
+        'key': 'mykey',
+        'target_uid': 'mytarget_uid',
+        'target_role': 0
+    }
+    assert handler.handle_obj_patch('oid', arg_parser) == {
+        'result': 'hello'
+    }
+    mock_execute_obj_patch.assert_called_once_with(
+        obj='obj', role=5, target_user=user2, target_role=0)

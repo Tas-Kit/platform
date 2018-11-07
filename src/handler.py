@@ -1,7 +1,7 @@
 import json
 from py2neo import Subgraph
 from . import db
-from .utils import handle_error
+from .utils import handle_error, assert_admin, assert_standard, assert_higher_permission
 from .models import User, MiniApp, TObject
 from .constants import ERROR_CODE, ROLE
 
@@ -58,17 +58,21 @@ def get_mini_app(uid, aid, platform_root_key):
     }
 
 
-def get_mini_apps(uid, platform_root_key):
+def get_mini_apps(uid):
     user = get_graph_obj(uid, User)
-    user.verify_key(platform_root_key)
     return {
-        'mini_apps': [app.serialize(user) for app in list(user.apps)]
+        'mini_apps': [app.serialize() for app in list(user.apps)]
     }
 
 
-def get_obj_by_id(oid, data):
+def get_obj_by_id(user, oid, data):
     if oid == 'root':
         obj = get_graph_obj(data['_id'], MiniApp)
+    elif data['_id'] == 'platform':
+        obj = get_graph_obj(oid, TObject)
+        role = user.share.get(obj, 'role')
+        assert_standard(role)
+        data['role'] = role
     elif oid != data['_id']:
         handle_error('Object ID does not match', ERROR_CODE.ID_NOT_MATCH)
     else:
@@ -82,16 +86,18 @@ def handle_obj_params(oid, obj_parser):
     key = args['key']
     user = get_graph_obj(uid, User)
     data = user.verify_key(key)
-    obj = get_obj_by_id(oid, data)
+    obj = get_obj_by_id(user, oid, data)
     params = {
         'user': user,
         'obj': obj,
-        'role': data['role']
+        'role': data['role'],
+        'children': [],
+        'oid_list': []
     }
     if 'oid_list' in args and args['oid_list'] is not None:
-        params['oid_list'] = args['oid_list'].split(',')
+        params['oid_list'] = args['oid_list']
     if 'children' in args and args['children'] is not None:
-        params['children'] = json.loads(args['children'])
+        params['children'] = args['children']
     return params
 
 
@@ -105,7 +111,7 @@ def process_obj_params(func):
 
 
 def serialize_objs(user, objs, role):
-    return [obj.serialize(user, role) for obj in objs]
+    return {obj.oid: obj.serialize(user, role) for obj in objs}
 
 
 @process_obj_params
@@ -114,16 +120,10 @@ def handle_obj_get(user, obj, role, **kwargs):
 
 
 def execute_obj_delete(obj, role, oid_list):
-    if role < ROLE.ADMIN:
-        handle_error('Permission deny. You do not have write permission.', ERROR_CODE.NO_WRITE_PERMISSION)
-    children = [child for child in list(obj.children) if child.oid in set(oid_list)]
-    all_children = []
-    for child in children:
-        all_children += child.get_all_children()
-    all_children += children
-    subgraph = Subgraph([child.__node__ for child in all_children])
+    assert_admin(role)
     try:
-        db.delete(subgraph)
+        db.run("MATCH (a:TObject)-[*0..]->(x:TObject) WHERE a.oid IN {oid_list} DETACH DELETE x"
+            .format(oid_list=str(oid_list)))
     except Exception as e:
         handle_error(e, ERROR_CODE.NEO4J_PUSH_FAILURE)
     return 'SUCCESS'
@@ -148,10 +148,9 @@ def handle_obj_replace(user, obj, role, oid_list, children, **kwargs):
 def execute_obj_post(user, obj, role, children):
     """
     Children example:
-    [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
+    [{"labels": ["Person"], "properties": {"age":10, "name":"owen"}}]
     """
-    if role < ROLE.ADMIN:
-        handle_error('Permission deny. You do not have write permission.', ERROR_CODE.NO_WRITE_PERMISSION)
+    assert_admin(role)
     objs = []
     for child in children:
         child_obj = TObject.new(child['labels'], child['properties'])
@@ -168,4 +167,40 @@ def execute_obj_post(user, obj, role, children):
 
 @process_obj_params
 def handle_obj_post(user, obj, role, children, **kwargs):
-    execute_obj_post(user, obj, role, children)
+    return execute_obj_post(user, obj, role, children)
+
+
+def execute_obj_patch(obj, role, target_user, target_role):
+    """
+    Grant target user with target role
+    """
+    assert_admin(role)
+    assert_higher_permission(role, target_role)
+    obj_role = target_user.share.get(obj, 'role')
+    if obj_role is not None:
+        assert_higher_permission(role, obj_role)
+    if target_role < ROLE.STANDARD:
+        target_user.share.remove(obj)
+    else:
+        target_user.share.update(obj, role=target_role)
+    db.push(target_user)
+    return 'SUCCESS'
+
+def handle_obj_patch(oid, obj_parser):
+    if oid == 'root':
+        handle_error('Unable to share app.', ERROR_CODE.UNABLE_TO_SHARE_APP)
+    args = obj_parser.parse_args()
+    uid = args['uid']
+    key = args['key']
+    user = get_graph_obj(uid, User)
+    data = user.verify_key(key)
+    obj = get_obj_by_id(user, oid, data)
+    params = {
+        'obj': obj,
+        'role': data['role'],
+        'target_user': get_graph_obj(args['target_uid'], User),
+        'target_role': args['target_role']
+    }
+    return {
+        'result': execute_obj_patch(**params)
+    }

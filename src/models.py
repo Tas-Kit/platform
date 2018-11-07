@@ -63,12 +63,12 @@ class MiniApp(GraphObject):
     users = RelatedFrom("User", "HasApp")
     children = RelatedTo(TObject, "Has")
 
-    def serialize(self, user):
+    def serialize(self, user=None):
         return {
             'aid': self.aid,
             'name': self.name,
             'app': self.app,
-            'key': user.generate_app_key(self)
+            'key': None if user is None else user.generate_app_key(self)
         }
 
 
@@ -92,6 +92,7 @@ class User(GraphObject):
     def generate_platform_root_key(self):
         data = {
             'uid': self.uid,
+            '_id': 'platform',
             'exp': int(time.time()) + SIGNATURE_DURATION
         }
         return utils.encrypt(data)

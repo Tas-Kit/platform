@@ -4,3 +4,4 @@ flask-script
 requests
 py2neo
 pycrypto
+pybase62
