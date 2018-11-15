@@ -1,9 +1,10 @@
-import json
-from py2neo import Subgraph
+from uuid import uuid4
+
 from . import db
-from .utils import handle_error, assert_admin, assert_standard, assert_higher_permission
-from .models import User, MiniApp, TObject
 from .constants import ERROR_CODE, ROLE
+from .models import MiniApp, TObject, User
+from .utils import (assert_admin, assert_higher_permission, assert_standard,
+                    handle_error)
 
 graph_obj_map = {
     User: {
@@ -27,16 +28,17 @@ graph_obj_map = {
 def get_graph_obj(_id, model):
     try:
         obj_map = graph_obj_map[model]
-        obj = model.match(db).where("_.{id_name} = '{_id}'"
-                                    .format(_id=_id, **obj_map)).first()
+        obj = model.match(db).where("_.{id_name} = '{_id}'".format(
+            _id=_id, **obj_map)).first()
         if obj is None:
             if model == User:
                 obj = User()
                 obj.uid = _id
                 db.push(obj)
             else:
-                handle_error('Unable to find {model_name} with given {id_name} "{_id}"'
-                             .format(_id=_id, **obj_map), obj_map['error_code'])
+                handle_error(
+                    'Unable to find {model_name} with given {id_name} "{_id}"'.
+                    format(_id=_id, **obj_map), obj_map['error_code'])
         return obj
     except Exception as e:
         handle_error(e, ERROR_CODE.NEO4J_DATABASE_ERROR)
@@ -44,25 +46,47 @@ def get_graph_obj(_id, model):
 
 def get_platform_root_key(uid):
     user = get_graph_obj(uid, User)
-    return {
-        'platform_root_key': user.generate_platform_root_key()
-    }
+    return {'platform_root_key': user.generate_platform_root_key()}
 
 
 def get_mini_app(uid, aid, platform_root_key):
     user = get_graph_obj(uid, User)
     user.verify_key(platform_root_key)
     app = get_graph_obj(aid, MiniApp)
-    return {
-        'mini_app': app.serialize(user)
-    }
+    return {'mini_app': app.serialize(user)}
 
 
 def get_mini_apps(uid):
     user = get_graph_obj(uid, User)
-    return {
-        'mini_apps': [app.serialize() for app in list(user.apps)]
-    }
+    return {'mini_apps': [app.serialize() for app in list(user.apps)]}
+
+
+def delete_mini_app(uid, aid, platform_root_key):
+    user = get_graph_obj(uid, User)
+    user.verify_key(platform_root_key)
+    app = get_graph_obj(aid, MiniApp)
+    role = user.get_role(app)
+    assert_higher_permission(role, ROLE.ADMIN)
+    try:
+        db.run("MATCH (a:MiniApp)-[*0..]->(x:TObject) WHERE a.aid='{aid}'"
+               " DETACH DELETE a, x".format(aid=app.aid))
+        db.run("MATCH (a:MiniApp) WHERE a.aid='{aid}'"
+               " DETACH DELETE a".format(aid=app.aid))
+    except Exception as e:
+        handle_error(e, ERROR_CODE.NEO4J_PUSH_FAILURE)
+    return {'result': 'SUCCESS'}
+
+
+def download_mini_app(uid, app):
+    user = get_graph_obj(uid, User)
+    aid = str(uuid4())
+    a = MiniApp()
+    a.aid = aid
+    a.name = app
+    a.app = app
+    user.apps.add(a, role=10)
+    db.push(user)
+    return {'mini_app': a.serialize()}
 
 
 def get_obj_by_id(user, oid, data):
@@ -104,9 +128,8 @@ def handle_obj_params(oid, obj_parser):
 def process_obj_params(func):
     def wrapper(oid, obj_parser):
         params = handle_obj_params(oid, obj_parser)
-        return {
-            'result': func(**params)
-        }
+        return {'result': func(**params)}
+
     return wrapper
 
 
@@ -122,11 +145,12 @@ def handle_obj_get(user, obj, role, **kwargs):
 def execute_obj_delete(obj, role, oid_list):
     assert_admin(role)
     try:
-        db.run("MATCH (a:TObject)-[*0..]->(x:TObject) WHERE a.oid IN {oid_list} DETACH DELETE x"
-            .format(oid_list=str(oid_list)))
+        db.run(
+            "MATCH (a:TObject)-[*0..]->(x:TObject) WHERE a.oid IN {oid_list}"
+            " DETACH DELETE x".format(oid_list=str(oid_list)))
     except Exception as e:
         handle_error(e, ERROR_CODE.NEO4J_PUSH_FAILURE)
-    return 'SUCCESS'
+    return {'result': 'SUCCESS'}
 
 
 @process_obj_params
@@ -150,6 +174,7 @@ def execute_obj_post(user, obj, role, children):
     Children example:
     [{"labels": ["Person"], "properties": {"age":10, "name":"owen"}}]
     """
+    print(children)
     assert_admin(role)
     objs = []
     for child in children:
@@ -184,7 +209,8 @@ def execute_obj_patch(obj, role, target_user, target_role):
     else:
         target_user.share.update(obj, role=target_role)
     db.push(target_user)
-    return 'SUCCESS'
+    return {'result': 'SUCCESS'}
+
 
 def handle_obj_patch(oid, obj_parser):
     if oid == 'root':
@@ -201,6 +227,4 @@ def handle_obj_patch(oid, obj_parser):
         'target_user': get_graph_obj(args['target_uid'], User),
         'target_role': args['target_role']
     }
-    return {
-        'result': execute_obj_patch(**params)
-    }
+    return {'result': execute_obj_patch(**params)}

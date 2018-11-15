@@ -1,8 +1,12 @@
-from py2neo.ogm import GraphObject, Property, RelatedFrom, RelatedTo
 import time
 import uuid
-from src import utils
+
+from py2neo.ogm import GraphObject, Property, RelatedFrom, RelatedTo
+
 from settings import SIGNATURE_DURATION
+
+from src import utils
+
 from .constants import ERROR_CODE
 
 
@@ -84,7 +88,8 @@ class User(GraphObject):
         except Exception as e:
             utils.handle_error(e, ERROR_CODE.UNABLE_TO_DECRYPT)
         if self.uid != data['uid']:
-            utils.handle_error("User does not match the platform root key.", ERROR_CODE.USER_NOT_MATCH)
+            utils.handle_error("User does not match the platform root key.",
+                               ERROR_CODE.USER_NOT_MATCH)
         if int(time.time()) > data['exp']:
             utils.handle_error("Key expired.", ERROR_CODE.KEY_EXPIRED)
         return data
@@ -106,7 +111,8 @@ class User(GraphObject):
     def get_role(self, app):
         role = self.apps.get(app, 'role')
         if role is None:
-            utils.handle_error('Unable to find app for current user.', ERROR_CODE.NOT_HAVE_APP)
+            utils.handle_error('Unable to find app for current user.',
+                               ERROR_CODE.NOT_HAVE_APP)
         return role
 
     def get_message(self, _id, role):

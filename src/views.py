@@ -2,7 +2,9 @@
 # a Python package so it can be accessed using the 'import' statement.
 
 from flask import Blueprint
-from flask_restplus import Api, Resource, reqparse, fields
+
+from flask_restplus import Api, Resource, fields, reqparse
+
 from . import handler
 
 main_blueprint = Blueprint('main', __name__)
@@ -11,8 +13,12 @@ main_blueprint = Blueprint('main', __name__)
 def register_blueprints(app):
     app.register_blueprint(main_blueprint, url_prefix='/api/v1/platform')
 
-api = Api(main_blueprint, version='1.0', title='Platform API',
-          description='Platform API')
+
+api = Api(
+    main_blueprint,
+    version='1.0',
+    title='Platform API',
+    description='Platform API')
 
 internal_ns = api.namespace('internal', description='Internal namespace')
 uid_parser = reqparse.RequestParser()
@@ -21,7 +27,6 @@ uid_parser.add_argument('uid', type=str, location='cookies')
 
 @internal_ns.route('/')
 class InternalView(Resource):
-
     @api.doc('Get Platform root key', parser=uid_parser)
     def get(self):
         """
@@ -32,16 +37,23 @@ class InternalView(Resource):
         return handler.get_platform_root_key(uid)
 
 
-app_ns = api.namespace('miniapp', description='Mini App level operation namespace.')
+app_ns = api.namespace(
+    'miniapp', description='Mini App level operation namespace.')
 
 app_parser = reqparse.RequestParser()
 app_parser.add_argument('uid', type=str, location='cookies')
-app_parser.add_argument('PlatformRootKey', required=False, type=str, location='headers')
+app_parser.add_argument(
+    'PlatformRootKey', required=False, type=str, location='headers')
+
+download_app_parser = reqparse.RequestParser()
+download_app_parser.add_argument(
+    'uid', type=str, required=True, location='cookies')
+download_app_parser.add_argument(
+    'app', type=str, required=True, location='json')
 
 
 @app_ns.route('/<string:aid>/')
 class MiniAppView(Resource):
-
     @api.doc('Get MiniApp', parser=app_parser)
     def get(self, aid):
         """
@@ -52,10 +64,19 @@ class MiniAppView(Resource):
         platform_root_key = args['PlatformRootKey']
         return handler.get_mini_app(uid, aid, platform_root_key)
 
+    @api.doc('Delete MiniApp', parser=app_parser)
+    def delete(self, aid):
+        """
+        Delete app with given app id (aid).
+        """
+        args = app_parser.parse_args()
+        uid = args['uid']
+        platform_root_key = args['PlatformRootKey']
+        return handler.delete_mini_app(uid, aid, platform_root_key)
+
 
 @app_ns.route('/')
 class MiniAppListView(Resource):
-
     @api.doc('Get All MiniApps', parser=app_parser)
     def get(self):
         """
@@ -65,13 +86,26 @@ class MiniAppListView(Resource):
         uid = args['uid']
         return handler.get_mini_apps(uid)
 
+    @api.doc('Download MiniApp', parser=download_app_parser)
+    def post(self):
+        """
+        Create mini app with given app name.
+        """
+        args = download_app_parser.parse_args()
+        uid = args['uid']
+        app = args['app']
+        return handler.download_mini_app(uid, app)
 
-obj_ns = api.namespace('tobject', description='TObject level operation namespace. NOTE: the root TObject (MiniApp) has the oid "root".')
+
+obj_ns = api.namespace(
+    'tobject',
+    description='TObject level operation namespace. '
+    'NOTE: the root TObject (MiniApp) has '
+    'the oid "root".')
 
 obj_get_parser = reqparse.RequestParser()
 obj_get_parser.add_argument('uid', type=str, location='cookies')
 obj_get_parser.add_argument('key', required=True, type=str, location='headers')
-
 
 obj_parser = reqparse.RequestParser()
 obj_parser.add_argument('uid', type=str, location='cookies')
@@ -81,22 +115,34 @@ obj_parser.add_argument('oid_list', type=list, location='json')
 
 obj_patch_parser = reqparse.RequestParser()
 obj_patch_parser.add_argument('uid', type=str, location='cookies')
-obj_patch_parser.add_argument('key', required=True, type=str, location='headers')
-obj_patch_parser.add_argument('target_uid', type=str, required=True, location='json')
-obj_patch_parser.add_argument('target_role', type=int, required=True, location='json')
+obj_patch_parser.add_argument(
+    'key', required=True, type=str, location='headers')
+obj_patch_parser.add_argument(
+    'target_uid', type=str, required=True, location='json')
+obj_patch_parser.add_argument(
+    'target_role', type=int, required=True, location='json')
 
-obj_model = api.model('TObject', {
-    'oid': fields.String(description='TObject ID.'),
-    'properties': fields.String(description='The actual properties (json encoded) in the customer object.'),
-    'labels': fields.List(fields.String, description='The all classes of the customer object (Avoid "TObject".'),
-    'key': fields.String(description='Secret key of the TObject.'),
-    'permission': fields.Integer(description='10:owner, 5:admin, 0:standard')
-})
+obj_model = api.model(
+    'TObject', {
+        'oid':
+        fields.String(description='TObject ID.'),
+        'properties':
+        fields.String(description='The actual properties (json encoded) '
+                      'in the customer object.'),
+        'labels':
+        fields.List(
+            fields.String,
+            description='The all classes of the customer '
+            'object (Avoid "TObject".'),
+        'key':
+        fields.String(description='Secret key of the TObject.'),
+        'permission':
+        fields.Integer(description='10:owner, 5:admin, 0:standard')
+    })
 
 
 @obj_ns.route('/<string:oid>/')
 class TObjectView(Resource):
-
     @api.doc('Get children of a TObject.', parser=obj_get_parser)
     def get(self, oid):
         """
@@ -120,7 +166,8 @@ class TObjectView(Resource):
         children example:
         [{'labels': ['Person'], 'properties': {'age':10, 'name':'owen'}}]
         oid example:
-        ['de593be7-0ace-4b3e-84f5-d21ece36a6f6', 'cf15ee45-0e77-43d3-ab1b-0efa2402412a']
+        ['de593be7-0ace-4b3e-84f5-d21ece36a6f6',
+        'cf15ee45-0e77-43d3-ab1b-0efa2402412a']
         """
         return handler.handle_obj_replace(oid, obj_parser)
 
@@ -129,7 +176,8 @@ class TObjectView(Resource):
         """
         Delete all child TObjects for parent TObject
         oid example:
-        ['de593be7-0ace-4b3e-84f5-d21ece36a6f6', 'cf15ee45-0e77-43d3-ab1b-0efa2402412a']
+        ['de593be7-0ace-4b3e-84f5-d21ece36a6f6',
+        'cf15ee45-0e77-43d3-ab1b-0efa2402412a']
         """
         return handler.handle_obj_delete(oid, obj_parser)
 
